@@ -55,6 +55,34 @@ export function cleanFirestoreData<T>(obj: T): T {
 }
 
 /**
+ * Normalizes asset paths so they resolve correctly across all hosting environments:
+ * - Local / AI Studio development (root '/')
+ * - Production on root domain (Vercel, Netlify, Cloud Run)
+ * - Subdirectory deployments (e.g. GitHub Pages https://<user>.github.io/<repo>/)
+ */
+export function resolveAssetUrl(url?: string | null): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+
+  // Preserve absolute external protocols and inline data/blob URIs
+  if (/^(https?:|\/\/|data:|blob:)/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Strip leading 'public/' if saved with prefix
+  let clean = trimmed.replace(/^public\//, '');
+  // Strip leading '/' so it becomes a relative asset path
+  if (clean.startsWith('/')) {
+    clean = clean.slice(1);
+  }
+
+  const base = import.meta.env.BASE_URL || './';
+  const prefix = base.endsWith('/') ? base : `${base}/`;
+  return `${prefix}${clean}`;
+}
+
+/**
  * Loads General Settings from Firestore or returns default settings
  */
 export async function getGeneralSettings(): Promise<GeneralSettings> {
@@ -64,16 +92,24 @@ export async function getGeneralSettings(): Promise<GeneralSettings> {
     if (raw) localSettings = JSON.parse(raw);
   } catch {}
 
+  let merged: GeneralSettings = { ...INITIAL_SETTINGS, ...localSettings };
+
   try {
     const settingsDoc = await getDoc(doc(db, 'settings', 'general'));
     if (settingsDoc.exists()) {
       const fsData = settingsDoc.data() as GeneralSettings;
-      return { ...INITIAL_SETTINGS, ...localSettings, ...fsData };
+      merged = { ...INITIAL_SETTINGS, ...localSettings, ...fsData };
     }
   } catch (error) {
     console.warn('Could not read settings/general from Firestore, using initial settings:', error);
   }
-  return { ...INITIAL_SETTINGS, ...localSettings };
+
+  return {
+    ...merged,
+    headerLogo: resolveAssetUrl(merged.headerLogo),
+    footerLogo: resolveAssetUrl(merged.footerLogo),
+    footerImage: resolveAssetUrl(merged.footerImage)
+  };
 }
 
 /**
@@ -200,10 +236,12 @@ export async function getProducts(): Promise<Product[]> {
     .filter((p) => !deletedIds.has(p.id))
     .map((p) => ({
       ...p,
+      images: Array.isArray(p.images) ? p.images.map(resolveAssetUrl) : [],
       packagingSize: p.packagingSize ? normalizePackagingSize(p.packagingSize, p.category) : p.packagingSize,
       variants: Array.isArray(p.variants)
         ? p.variants.map((v) => ({
             ...v,
+            image: v.image ? resolveAssetUrl(v.image) : v.image,
             packagingSize: v.packagingSize
               ? normalizePackagingSize(v.packagingSize, p.category)
               : normalizePackagingSize(v.name, p.category)
@@ -361,6 +399,10 @@ export async function getCategories(): Promise<Category[]> {
 
   const finalCategories = Array.from(map.values())
     .filter((c) => !deletedIds.has(c.id))
+    .map((c) => ({
+      ...c,
+      image: resolveAssetUrl(c.image)
+    }))
     .sort((a, b) => (a.order || 0) - (b.order || 0));
 
   return finalCategories;

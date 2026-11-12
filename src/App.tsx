@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, Component, ErrorInfo } from 'react';
+import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { CoinWalletProvider } from './context/CoinWalletContext';
@@ -7,7 +7,7 @@ import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HygieneAdvisorModal } from './components/HygieneAdvisorModal';
 import { testConnection } from './lib/firebase';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, RefreshCw } from 'lucide-react';
 
 // Pages
 import { HomePage } from './pages/HomePage';
@@ -27,6 +27,63 @@ import { PrivacyPolicyPage, TermsPage, ShippingPolicyPage, ReturnsPolicyPage } f
 import { SearchPage } from './pages/SearchPage';
 import { AdminPage } from './pages/admin/AdminPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+
+// Robust Error Boundary to prevent white screen / blank page crashes
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('WiZ App caught an error in ErrorBoundary:', error, errorInfo);
+  }
+
+  handleReload = () => {
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-center font-['Inter',sans-serif]">
+          <div className="bg-white p-8 max-w-md w-full border border-gray-200 shadow-xl rounded-none">
+            <div className="w-12 h-12 mx-auto bg-purple-50 text-[#7a49a6] flex items-center justify-center rounded-full mb-4">
+              <RefreshCw className="w-6 h-6 animate-spin" />
+            </div>
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight">
+              WiZ Hygiene &amp; Personal Care
+            </h1>
+            <p className="text-sm text-gray-600 mt-2">
+              The application encountered a temporary display issue.
+            </p>
+            <button
+              onClick={this.handleReload}
+              className="mt-6 w-full bg-[#7a49a6] hover:bg-black text-white py-3 px-4 text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center space-x-2 cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Reload Application</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Scroll to top on navigation helper
 function ScrollToTop() {
@@ -72,38 +129,40 @@ export default function App() {
   }, []);
 
   return (
-    <AuthProvider>
-      <CartProvider>
-        <CoinWalletProvider>
-          <Router>
-            <ScrollToTop />
-            <MainLayout>
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/shop" element={<ShopPage />} />
-                <Route path="/category/:slug" element={<CategoryPage />} />
-                <Route path="/product/:slug" element={<ProductDetailPage />} />
-                <Route path="/cart" element={<CartPage />} />
-                <Route path="/checkout" element={<CheckoutPage />} />
-                <Route path="/order-confirmation/:orderNumber" element={<OrderConfirmationPage />} />
-                <Route path="/bulk-order" element={<BulkOrderPage />} />
-                <Route path="/offers" element={<OffersPage />} />
-                <Route path="/advisor" element={<HygieneAdvisorPage />} />
-                <Route path="/about" element={<AboutPage />} />
-                <Route path="/contact" element={<ContactPage />} />
-                <Route path="/faqs" element={<FaqPage />} />
-                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-                <Route path="/terms" element={<TermsPage />} />
-                <Route path="/shipping-policy" element={<ShippingPolicyPage />} />
-                <Route path="/returns-policy" element={<ReturnsPolicyPage />} />
-                <Route path="/search" element={<SearchPage />} />
-                <Route path="/admin" element={<AdminPage />} />
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
-            </MainLayout>
-          </Router>
-        </CoinWalletProvider>
-      </CartProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <CartProvider>
+          <CoinWalletProvider>
+            <Router>
+              <ScrollToTop />
+              <MainLayout>
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/shop" element={<ShopPage />} />
+                  <Route path="/category/:slug" element={<CategoryPage />} />
+                  <Route path="/product/:slug" element={<ProductDetailPage />} />
+                  <Route path="/cart" element={<CartPage />} />
+                  <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route path="/order-confirmation/:orderNumber" element={<OrderConfirmationPage />} />
+                  <Route path="/bulk-order" element={<BulkOrderPage />} />
+                  <Route path="/offers" element={<OffersPage />} />
+                  <Route path="/advisor" element={<HygieneAdvisorPage />} />
+                  <Route path="/about" element={<AboutPage />} />
+                  <Route path="/contact" element={<ContactPage />} />
+                  <Route path="/faqs" element={<FaqPage />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                  <Route path="/terms" element={<TermsPage />} />
+                  <Route path="/shipping-policy" element={<ShippingPolicyPage />} />
+                  <Route path="/returns-policy" element={<ReturnsPolicyPage />} />
+                  <Route path="/search" element={<SearchPage />} />
+                  <Route path="/admin" element={<AdminPage />} />
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </MainLayout>
+            </Router>
+          </CoinWalletProvider>
+        </CartProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
